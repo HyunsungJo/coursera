@@ -14,7 +14,8 @@ object WikipediaRanking {
     "JavaScript", "Java", "PHP", "Python", "C#", "C++", "Ruby", "CSS",
     "Objective-C", "Perl", "Scala", "Haskell", "MATLAB", "Clojure", "Groovy")
 
-  val conf: SparkConf = new SparkConf()
+  val conf = new SparkConf().setMaster("local[4]").setAppName("wikipedia").set("driver-memory", "4g")
+
   val sc: SparkContext = new SparkContext(config = conf)
   // Hint: use a combination of `sc.textFile`, `WikipediaData.filePath` and `WikipediaData.parse`
   val wikiRdd: RDD[WikipediaArticle] = sc.textFile(WikipediaData.filePath).map(WikipediaData.parse)
@@ -25,14 +26,9 @@ object WikipediaRanking {
    *  Hint3: the only whitespaces are blanks " "
    *  Hint4: no need to search in the title :)
    */
+
   def occurrencesOfLang(lang: String, rdd: RDD[WikipediaArticle]): Int = {
-    val filteredRdd = rdd.filter { article =>
-      lang match {
-        case "Java" => article.text.replace("JavaScript", "JScript").contains(lang)
-        case _ => article.text.contains(lang)
-      }
-    }
-    filteredRdd.aggregate(0)((x,y) => x+1, (x,y) => x+y)
+    rdd.filter(article => article.text.split(" ").contains(lang)).aggregate(0)((x,y) => x+1, (x,y) => x+y)
   }
 
   /* (1) Use `occurrencesOfLang` to compute the ranking of the languages
@@ -52,7 +48,7 @@ object WikipediaRanking {
    */
   def makeIndex(langs: List[String], rdd: RDD[WikipediaArticle]): RDD[(String, Iterable[WikipediaArticle])] = {
     rdd.flatMap { article =>
-      langs.filter(article.text.contains(_)).map(_ -> article)
+      langs.filter(article.text.split(" ").contains(_)).map(_ -> article)
     }.groupByKey()
   }
 
@@ -75,8 +71,8 @@ object WikipediaRanking {
    */
   def rankLangsReduceByKey(langs: List[String], rdd: RDD[WikipediaArticle]): List[(String, Int)] = {
     rdd.flatMap { article =>
-      langs.filter(article.text.contains(_)).map(_ -> 1)
-    }.reduceByKey(_+_).collect().toList
+      langs.filter(article.text.split(" ").contains(_)).map(_ -> 1)
+    }.reduceByKey(_+_).collect().toList.sortBy(-_._2)
   }
 
   def main(args: Array[String]) {
