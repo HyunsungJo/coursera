@@ -7,6 +7,7 @@ lib_managed/
 src_managed/
 project/boot/
 project/target/
+src/main/resources/*
 .history
 .cache
 
