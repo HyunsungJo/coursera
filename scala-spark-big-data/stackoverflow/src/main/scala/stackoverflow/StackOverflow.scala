@@ -101,9 +101,8 @@ class StackOverflow extends Serializable {
     }
 
     grouped.map { case (qid, pairs) =>
-      val m = pairs.toMap
-      val q = m.keys.head
-      val maxScore = answerHighScore(m.values.toArray)
+      val q = pairs.head._1
+      val maxScore = answerHighScore(pairs.map(_._2).toArray)
       q -> maxScore
     }
   }
@@ -190,13 +189,13 @@ class StackOverflow extends Serializable {
   /** Main kmeans computation */
   @tailrec final def kmeans(means: Array[(Int, Int)], vectors: RDD[(Int, Int)], iter: Int = 1, debug: Boolean = false): Array[(Int, Int)] = {
     val newMeans = means.clone() // you need to compute newMeans
+    val vecs = vectors.cache()
 
-    val m = vectors.map(p => findClosest(p, means) -> p).groupByKey().map { case (c, cluster) => c -> averageVectors(cluster) }.collect().toMap
+    val classified = vecs.groupBy(findClosest(_, means)).mapValues(averageVectors).collect()
 
-    (0 to newMeans.size-1).foreach { i =>
-      val c = newMeans(i)
-      newMeans(i) = m.getOrElse(c._1/langSpread, c)
-    }
+    for {
+      (index, point )<- classified
+    } yield newMeans.update(index, point)
 
     val distance = euclideanDistance(means, newMeans)
 
@@ -213,7 +212,7 @@ class StackOverflow extends Serializable {
     if (converged(distance))
       newMeans
     else if (iter < kmeansMaxIterations)
-      kmeans(newMeans, vectors, iter + 1, debug)
+      kmeans(newMeans, vecs, iter + 1, debug)
     else {
       println("Reached max iterations!")
       newMeans
