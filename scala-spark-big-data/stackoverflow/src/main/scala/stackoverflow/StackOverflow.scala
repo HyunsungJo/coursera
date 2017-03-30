@@ -191,7 +191,13 @@ class StackOverflow extends Serializable {
   @tailrec final def kmeans(means: Array[(Int, Int)], vectors: RDD[(Int, Int)], iter: Int = 1, debug: Boolean = false): Array[(Int, Int)] = {
     val newMeans = means.clone() // you need to compute newMeans
 
-    // TODO: Fill in the newMeans array
+    val m = vectors.map(p => findClosest(p, means) -> p).groupByKey().map { case (c, cluster) => c -> averageVectors(cluster) }.collect().toMap
+
+    (0 to newMeans.size-1).foreach { i =>
+      val c = newMeans(i)
+      newMeans(i) = m.getOrElse(c._1/langSpread, c)
+    }
+
     val distance = euclideanDistance(means, newMeans)
 
     if (debug) {
@@ -299,15 +305,23 @@ class StackOverflow extends Serializable {
 
       val langPercent: Double = {
         val count = vs.filter { case (a, b) => langs(a/langSpread) == langLabel }.size
-        count.toDouble / vs.size.toDouble
+        count.toDouble / vs.size.toDouble * 100
       }
 
       val clusterSize: Int = vs.size
       val medianScore: Int = {
-        val sortedScores = vs.map(_._2).toSeq.sorted
+        val size = vs.filter { case (a, b) =>
+          langs(a/langSpread) == langLabel
+        }.size
+        val sortedScores = vs.filter { case (a, b) =>
+          langs(a/langSpread) == langLabel
+        }.map(_._2).toSeq.sorted
+//        println(s">>>>> sortedScores: $sortedScores")
+//        println(s">>>>> odd/ event: ${size%2}")
         val res =
-          if (clusterSize%2 == 1) sortedScores(clusterSize/2)
-          else (sortedScores(clusterSize/2 - 1) + sortedScores(clusterSize/2))/2
+          if (size%2 == 1) sortedScores(size/2)
+          else (sortedScores(size/2 - 1) + sortedScores(size/2))/2
+//        println(s">>>>> res: $res")
         res
       }
 
