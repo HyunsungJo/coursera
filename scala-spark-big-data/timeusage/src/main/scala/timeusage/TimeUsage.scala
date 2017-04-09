@@ -198,8 +198,12 @@ object TimeUsage {
     * Hint: you should use the `getAs` method of `Row` to look up columns and
     * cast them at the same time.
     */
-  def timeUsageSummaryTyped(timeUsageSummaryDf: DataFrame): Dataset[TimeUsageRow] =
-    ???
+  def timeUsageSummaryTyped(timeUsageSummaryDf: DataFrame): Dataset[TimeUsageRow] = {
+    timeUsageSummaryDf.map {
+      case Row(working: String, sex: String, age: String, primaryNeeds: Double, work: Double, other: Double) =>
+        TimeUsageRow(working, sex, age, primaryNeeds, work, other)
+    }
+  }
 
   /**
     * @return Same as `timeUsageGrouped`, but using the typed API when possible
@@ -214,7 +218,7 @@ object TimeUsage {
     */
   def timeUsageGroupedTyped(summed: Dataset[TimeUsageRow]): Dataset[TimeUsageRow] = {
     import org.apache.spark.sql.expressions.scalalang.typed
-    ???
+    summed
   }
 }
 
