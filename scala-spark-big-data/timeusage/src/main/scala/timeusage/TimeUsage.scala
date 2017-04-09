@@ -64,8 +64,8 @@ object TimeUsage {
     */
   def dfSchema(columnNames: List[String]): StructType = {
     val types = columnNames.zipWithIndex.map { case (s: String, i: Int) =>
-        if (i == 0) StructField(s, StringType)
-        else StructField(s, DoubleType)
+        if (i == 0) StructField(s, StringType, false)
+        else StructField(s, DoubleType, false)
     }
     StructType(types)
   }
@@ -92,8 +92,12 @@ object TimeUsage {
     *    “t10”, “t12”, “t13”, “t14”, “t15”, “t16” and “t18” (those which are not part of the previous groups only).
     */
   def classifiedColumns(columnNames: List[String]): (List[Column], List[Column], List[Column]) = {
-    val (ps, rs) = columnNames.partition(_.startsWith(Seq("t01", "t03", "t11", "t1801", "t1803")))
-    val (ws, os) = rs.partition(_.startsWith(Seq("t05", "t1805")))
+    val (ps, rs) = columnNames.partition(s => s.startsWith("t01") || s.startsWith("t03") ||
+      s.startsWith("t11") || s.startsWith("t1801") || s.startsWith("t1803"))
+    val (ws, rs2) = rs.partition(s => s.startsWith("t05") || s.startsWith("t1805"))
+    val (os, _) = rs2.partition(s => s.startsWith("t02") || s.startsWith("t04") || s.startsWith("t06") ||
+      s.startsWith("t07") || s.startsWith("t08") || s.startsWith("t09") || s.startsWith("t10") || s.startsWith("t12") ||
+      s.startsWith("t13") || s.startsWith("t14") || s.startsWith("t15") || s.startsWith("t16") || s.startsWith("t18"))
     val primary = ps.map(col)
     val work = ws.map(col)
     val other = os.map(col)
@@ -143,7 +147,7 @@ object TimeUsage {
       .otherwise("elder")
       .as("age")
 
-    val primaryNeedsProjection: Column = primaryNeedsColumns.map(_ / lit(60)).reduce(_+_).as("primaryNeeds")
+    val primaryNeedsProjection: Column = (primaryNeedsColumns.reduce(_+_) / lit(60)).as("primaryNeeds")
     val workProjection: Column = workColumns.map(_ / lit(60)).reduce(_+_).as("work")
     val otherProjection: Column = otherColumns.map(_ / lit(60)).reduce(_+_).as("other")
     df
@@ -169,7 +173,9 @@ object TimeUsage {
     * Finally, the resulting DataFrame should be sorted by working status, sex and age.
     */
   def timeUsageGrouped(summed: DataFrame): DataFrame = {
-    summed.groupBy("working", "sex", "age").agg(round(avg("primaryNeeds")), round(avg("work")), round(avg("other")))
+    summed.groupBy("working", "sex", "age")
+      .agg(round(avg("primaryNeeds"), 1), round(avg("work"), 1), round(avg("other"), 1))
+      .sort("working", "sex", "age")
   }
 
   /**
@@ -187,8 +193,8 @@ object TimeUsage {
     */
   def timeUsageGroupedSqlQuery(viewName: String): String =
     s"""
-       |SELECT working, sex, age, ROUND(AVG(primaryNeeds)), ROUND(AVG(work)), ROUNG(AVG(other))
-       |FROM $viewName GROUP BY working, sex, age
+       |SELECT working, sex, age, ROUND(AVG(primaryNeeds), 1), ROUND(AVG(work), 1), ROUND(AVG(other), 1)
+       |FROM $viewName GROUP BY working, sex, age ORDER BY working, sex, age
        |""".stripMargin
 
   /**
@@ -218,7 +224,14 @@ object TimeUsage {
     */
   def timeUsageGroupedTyped(summed: Dataset[TimeUsageRow]): Dataset[TimeUsageRow] = {
     import org.apache.spark.sql.expressions.scalalang.typed
-    summed
+    val grouped = summed.groupByKey[(String, String, String)]((r: TimeUsageRow) => (r.working, r.sex, r.age))
+    val agged = grouped.agg(round(typed.avg[TimeUsageRow](_.primaryNeeds), 1).as[Double],
+      round(typed.avg[TimeUsageRow](_.work), 1).as[Double],
+      round(typed.avg[TimeUsageRow](_.other), 1).as[Double])
+    val mapped = agged.map { case (Tuple3(working, sex, age), primaryNeeds, work, other) =>
+      TimeUsageRow(working, sex, age, primaryNeeds, work, other)
+    }
+    mapped.sort("working", "sex", "age")
   }
 }
 
