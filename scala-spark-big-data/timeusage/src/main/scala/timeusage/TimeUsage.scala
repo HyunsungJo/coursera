@@ -92,12 +92,13 @@ object TimeUsage {
     *    “t10”, “t12”, “t13”, “t14”, “t15”, “t16” and “t18” (those which are not part of the previous groups only).
     */
   def classifiedColumns(columnNames: List[String]): (List[Column], List[Column], List[Column]) = {
-    val (ps, rs) = columnNames.partition(s => s.startsWith("t01") || s.startsWith("t03") ||
-      s.startsWith("t11") || s.startsWith("t1801") || s.startsWith("t1803"))
-    val (ws, rs2) = rs.partition(s => s.startsWith("t05") || s.startsWith("t1805"))
-    val (os, _) = rs2.partition(s => s.startsWith("t02") || s.startsWith("t04") || s.startsWith("t06") ||
-      s.startsWith("t07") || s.startsWith("t08") || s.startsWith("t09") || s.startsWith("t10") || s.startsWith("t12") ||
-      s.startsWith("t13") || s.startsWith("t14") || s.startsWith("t15") || s.startsWith("t16") || s.startsWith("t18"))
+    val primaryPrefixLs = List("t01", "t03", "t11", "t1801", "t1803")
+    val workingPrefixLs = List("t05", "t1805")
+    val otherPrefixls = List("t02", "t04", "t06", "t70", "t80", "t90", "t10", "t12", "t13", "t14", "t15", "t16", "t18")
+
+    val (ps, rest1) = columnNames.partition(s => primaryPrefixLs.exists(s.startsWith))
+    val (ws, rest2) = rest1.partition(s => workingPrefixLs.exists(s.startsWith))
+    val (os, _) = rest2.partition(s => otherPrefixls.exists(s.startsWith))
     val primary = ps.map(col)
     val work = ws.map(col)
     val other = os.map(col)
