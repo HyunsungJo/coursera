@@ -22,10 +22,10 @@ grad = zeros(size(theta));
 z = X * theta;
 sig = sigmoid(z);
 J = sum((-y)'*log(sig) - (1 - y)'*log(1 - sig)) / m;
-one = sum(X(:, 1)' * (sig - y)) / m;
-two = sum(X(:, 2)' * (sig - y)) / m;
-three = sum(X(:, 3)' * (sig - y)) / m;
-grad = [one, two, three];
+
+for i = 1:columns(X)
+  grad(i) = sum(X(:, i)' * (sig - y)) / m;
+end
 % =============================================================
 
 end
