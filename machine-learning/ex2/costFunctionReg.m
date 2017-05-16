@@ -21,15 +21,12 @@ z = X * theta;
 sig = sigmoid(z);
 reg = sum(theta(2:end) .^ 2) * lambda / (2*m);
 J = sum((-y)'*log(sig) - (1 - y)'*log(1 - sig)) / m + reg;
-size(theta)
-grad(2)
 reg = 0;
+
 for j = 1:columns(X)
-  %j
-  %theta(j) * lambda / m
-  %X(:, j)
   reg(j > 1) = theta(j) * lambda / m;
-  grad(j) = sum((sig - y) * X(j)) / m + reg;
+  grad(j) = sum(X(:,j)' * (sig - y)) / m + reg;
+  grad(j);
 end
 
 
